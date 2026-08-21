@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
+frontend/.env.development
+frontend/.env.production
+frontend/.env.local
+frontend/.env.*.local
