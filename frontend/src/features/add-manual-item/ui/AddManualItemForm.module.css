@@ -1,0 +1,16 @@
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.error {
+  margin: -2px 0 0;
+  color: #a33a16;
+  font-size: 0.9rem;
+}
+
+.error {
+  margin: -2px 0 0;
+  color: #a33a16;
+  font-size: 0.9rem;
+}

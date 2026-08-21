@@ -1,0 +1,18 @@
+.viewport {
+  position: relative;
+  overflow-y: auto;
+  min-height: 320px;
+  max-height: 620px;
+  padding-right: 6px;
+}
+
+.content {
+  position: relative;
+  width: 100%;
+}
+
+.window {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+}

@@ -1,0 +1,35 @@
+.layout {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgb(236 107 52 / 18%), transparent 32%),
+    radial-gradient(circle at right, rgb(38 84 124 / 18%), transparent 28%),
+    linear-gradient(180deg, #f4efe6 0%, #fbf8f2 52%, #eef3f5 100%);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(22 32 43 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(22 32 43 / 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, rgb(0 0 0 / 88%), rgb(0 0 0 / 20%));
+  pointer-events: none;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  width: min(1380px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 56px;
+}
+
+@media (max-width: 768px) {
+  .content {
+    width: min(100% - 20px, 1240px);
+    padding: 20px 0 28px;
+  }
+}

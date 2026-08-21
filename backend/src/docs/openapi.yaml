@@ -1,0 +1,492 @@
+openapi: 3.1.0
+info:
+  title: API
+  version: 1.0.0
+  description: |-
+    API для тестового fullstack-проекта с двумя списками элементов:
+    доступные элементы слева и выбранные элементы справа.
+
+    Возможности API:
+    - получение списка доступных элементов
+    - получение списка выбранных элементов
+    - фильтрация по ID
+    - cursor-based pagination для infinite scroll
+    - ручное добавление новых ID
+    - выбор, снятие выбора и сортировка выбранных элементов
+    - батч-обработка команд с дедупликацией
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+tags:
+  - name: health
+    description: Проверка состояния сервиса.
+  - name: items
+    description: Работа со списками элементов.
+  - name: selection
+    description: Управление выбранными элементами.
+  - name: batch
+    description: Батч-обработка команд.
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Проверка состояния API
+      responses:
+        '200':
+          description: Сервис доступен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/items/available:
+    get:
+      tags: [items]
+      summary: Получить доступные элементы
+      description: |-
+        Возвращает элементы для левого списка.
+        Выбранные элементы исключаются из результата.
+        Поддерживаются фильтрация по ID и cursor-based pagination.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: Страница доступных элементов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemsPageResponse'
+        '400':
+          description: Ошибка валидации query-параметров.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/items/selected:
+    get:
+      tags: [items]
+      summary: Получить выбранные элементы
+      description: |-
+        Возвращает элементы для правого списка.
+        Порядок соответствует сохраненной сортировке выбранных элементов.
+        Поддерживаются фильтрация по ID и cursor-based pagination.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Query'
+      responses:
+        '200':
+          description: Страница выбранных элементов.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemsPageResponse'
+        '400':
+          description: Ошибка валидации query-параметров.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/items/custom:
+    post:
+      tags: [items]
+      summary: Добавить пользовательские элементы
+      description: Добавляет новые вручную введенные ID, которых еще нет в системе.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCustomItemsRequest'
+      responses:
+        '200':
+          description: Пользовательские элементы успешно добавлены.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddCustomItemsResponse'
+        '400':
+          description: Ошибка валидации тела запроса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Один или несколько ID уже существуют.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/selection/select:
+    post:
+      tags: [selection]
+      summary: Выбрать элементы
+      description: Добавляет элементы в список выбранных.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdsRequest'
+      responses:
+        '200':
+          description: Список выбранных элементов обновлен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelectionResponse'
+        '400':
+          description: Переданы невалидные или неизвестные ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/selection/unselect:
+    post:
+      tags: [selection]
+      summary: Снять выбор с элементов
+      description: Удаляет элементы из списка выбранных.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IdsRequest'
+      responses:
+        '200':
+          description: Список выбранных элементов обновлен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelectionResponse'
+        '400':
+          description: Ошибка валидации тела запроса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/selection/reorder:
+    post:
+      tags: [selection]
+      summary: Изменить порядок выбранных элементов
+      description: |-
+        Перемещает один выбранный элемент относительно другого
+        внутри сохраненного порядка выбранных элементов.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderRequest'
+      responses:
+        '200':
+          description: Порядок выбранных элементов обновлен.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelectionResponse'
+        '400':
+          description: Невалидный payload для reorder.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/batch/flush:
+    post:
+      tags: [batch]
+      summary: Выполнить батч-команды
+      description: |-
+        Принимает набор команд, применяет дедупликацию очереди
+        и выполняет итоговые операции одним flush.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchFlushRequest'
+      responses:
+        '200':
+          description: Батч успешно обработан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchFlushResponse'
+        '400':
+          description: Ошибка валидации тела запроса.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Максимальное количество элементов в одной странице.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor из предыдущего ответа.
+      schema:
+        type: string
+    Query:
+      name: query
+      in: query
+      required: false
+      description: Подстрока для фильтрации по ID элемента.
+      schema:
+        type: string
+        default: ''
+
+  schemas:
+    Item:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          example: 42
+
+    PageMeta:
+      type: object
+      required: [limit, hasMore, nextCursor]
+      properties:
+        limit:
+          type: integer
+          example: 20
+        hasMore:
+          type: boolean
+          example: true
+        nextCursor:
+          type:
+            - string
+            - 'null'
+          example: eyJ0eXBlIjoiYXZhaWxhYmxlIiwibGFzdFNlZW5JZCI6MjB9
+
+    ErrorObject:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: Ошибка валидации
+        details:
+          type:
+            - object
+            - array
+            - string
+            - number
+            - boolean
+            - 'null'
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+
+    HealthData:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/HealthData'
+
+    ItemsPageResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+
+    IdsRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            example: 15
+
+    ReorderRequest:
+      type: object
+      required: [activeId, overId]
+      properties:
+        activeId:
+          type: integer
+          example: 15
+        overId:
+          type: integer
+          example: 7
+
+    AddCustomItemsRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+            example: 1000001
+
+    AddCustomItemsData:
+      type: object
+      required: [addedIds, count]
+      properties:
+        addedIds:
+          type: array
+          items:
+            type: integer
+        count:
+          type: integer
+          example: 2
+
+    AddCustomItemsResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/AddCustomItemsData'
+
+    SelectionData:
+      type: object
+      required: [selectedIds]
+      properties:
+        selectedIds:
+          type: array
+          items:
+            type: integer
+            example: 7
+
+    SelectionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/SelectionData'
+
+    AddItemsCommand:
+      type: object
+      required: [type, ids]
+      properties:
+        type:
+          type: string
+          const: add-items
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+
+    SelectItemsCommand:
+      type: object
+      required: [type, ids]
+      properties:
+        type:
+          type: string
+          const: select-items
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+
+    UnselectItemsCommand:
+      type: object
+      required: [type, ids]
+      properties:
+        type:
+          type: string
+          const: unselect-items
+        ids:
+          type: array
+          minItems: 1
+          items:
+            type: integer
+
+    ReorderSelectedCommand:
+      type: object
+      required: [type, activeId, overId]
+      properties:
+        type:
+          type: string
+          const: reorder-selected
+        activeId:
+          type: integer
+        overId:
+          type: integer
+
+    BatchFlushRequest:
+      type: object
+      required: [commands]
+      properties:
+        commands:
+          type: array
+          minItems: 1
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/AddItemsCommand'
+              - $ref: '#/components/schemas/SelectItemsCommand'
+              - $ref: '#/components/schemas/UnselectItemsCommand'
+              - $ref: '#/components/schemas/ReorderSelectedCommand'
+
+    BatchFlushData:
+      type: object
+      required: [processed, addItemsCount, selectionOperationsCount, reordered]
+      properties:
+        processed:
+          type: boolean
+          example: true
+        addItemsCount:
+          type: integer
+          example: 1
+        selectionOperationsCount:
+          type: integer
+          example: 2
+        reordered:
+          type: boolean
+          example: false
+
+    BatchFlushResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/BatchFlushData'
